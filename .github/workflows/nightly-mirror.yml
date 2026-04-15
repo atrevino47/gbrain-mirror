@@ -1,0 +1,46 @@
+name: Nightly Mirror of garrytan/gbrain
+
+on:
+  schedule:
+    # 05:00 UTC daily (00:00 America/Monterrey CDT = 05:00 UTC)
+    - cron: '0 5 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout mirror repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Configure git identity
+        run: |
+          git config user.name "gbrain-mirror-bot"
+          git config user.email "mirror-bot@users.noreply.github.com"
+
+      - name: Fetch all refs from upstream
+        run: |
+          git remote add upstream https://github.com/garrytan/gbrain.git || true
+          git fetch upstream '+refs/heads/*:refs/heads/upstream/*'
+          git fetch upstream '+refs/tags/*:refs/tags/*'
+
+      - name: Push upstream refs to mirror
+        run: |
+          # Push mirrored branches (upstream/* namespace) and tags
+          # Leaves main branch (with this workflow) untouched
+          git push origin 'refs/heads/upstream/*:refs/heads/upstream/*' --force
+          git push origin 'refs/tags/*:refs/tags/*' --force
+
+      - name: Log mirror snapshot
+        run: |
+          echo "Mirror run: $(date -u)"
+          echo "Upstream branches mirrored:"
+          git branch -r | grep '^  origin/upstream/' || true
+          echo "Tags mirrored:"
+          git tag -l | tail -20
